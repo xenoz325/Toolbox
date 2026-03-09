@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All-in-One Web Toolbox</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --success: #059669;
+            --danger: #dc2626;
+            --bg: #f8fafc;
+        }
+        body { 
+            font-family: 'Segoe UI', Tahoma, sans-serif; 
+            background-color: var(--bg); 
+            margin: 0; 
+            padding: 20px; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+        }
+        .container { width: 100%; max-width: 500px; }
+        .card { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 16px; 
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); 
+            margin-bottom: 20px; 
+            text-align: center;
+        }
+        video { 
+            width: 100%; 
+            border-radius: 12px; 
+            background: #000; 
+            margin-bottom: 15px; 
+            transform: scaleX(1); /* Balikkan jika ingin mode selfie */
+        }
+        .main-btn { 
+            width: 100%; 
+            padding: 15px; 
+            font-size: 18px; 
+            font-weight: bold; 
+            background: var(--primary); 
+            color: white; 
+            border: none; 
+            border-radius: 10px; 
+            cursor: pointer;
+            margin-bottom: 15px;
+        }
+        .grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 10px; 
+        }
+        .sub-btn { 
+            padding: 10px; 
+            font-size: 14px; 
+            border: 1px solid #ddd; 
+            border-radius: 8px; 
+            background: white; 
+            cursor: pointer; 
+        }
+        .status-box { 
+            text-align: left; 
+            font-size: 14px; 
+            background: #f1f5f9; 
+            padding: 15px; 
+            border-radius: 10px; 
+            line-height: 1.8;
+        }
+        .record-active { background: var(--danger) !important; color: white; }
+        #audioPlayback { width: 100%; margin-top: 10px; display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2 style="text-align: center;">🚀 Super Toolbox</h2>
+
+        <button class="main-btn" id="btnMain">AKTIFKAN SEMUA FITUR</button>
+
+        <div class="card">
+            <video id="video" autoplay playsinline></video>
+            <div class="grid">
+                <button class="sub-btn" id="btnSenter">🔦 Toggle Senter</button>
+                <button class="sub-btn" id="btnFull">🖥️ Layar Penuh</button>
+                <button class="sub-btn" id="btnVibrate">📳 Test Getar</button>
+                <button class="sub-btn" onclick="location.reload()">🔄 Reset App</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <strong>🎙️ Voice Recorder</strong>
+            <div class="grid" style="margin-top: 10px;">
+                <button id="startRec" class="sub-btn">Mulai Rekam</button>
+                <button id="stopRec" class="sub-btn" disabled>Berhenti</button>
+            </div>
+            <audio id="audioPlayback" controls></audio>
+        </div>
+
+        <div class="card">
+            <div class="status-box">
+                📍 <b>Lokasi:</b> <span id="statGPS">Menunggu izin...</span><br>
+                🔋 <b>Baterai:</b> <span id="statBat">-</span><br>
+                🌐 <b>Internet:</b> <span id="statNet">-</span><br>
+                🧭 <b>Orientasi:</b> <span id="statOri">-</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const btnMain = document.getElementById('btnMain');
+        const btnSenter = document.getElementById('btnSenter');
+        const btnVibrate = document.getElementById('btnVibrate');
+        const audioPlayback = document.getElementById('audioPlayback');
+        
+        let track = null;
+        let mediaRecorder;
+        let audioChunks = [];
+
+        // --- FUNGSI UTAMA ---
+        btnMain.addEventListener('click', async () => {
+            btnMain.innerText = "Mengaktifkan...";
+            
+            try {
+                // 1. Kamera & Audio Permission
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment' }, 
+                    audio: true 
+                });
+                video.srcObject = stream;
+                track = stream.getVideoTracks()[0];
+
+                // 2. Cek Senter Secara Otomatis
+                const caps = track.getCapabilities();
+                if (caps.torch) {
+                    // Nyalakan senter langsung saat klik utama
+                    await track.applyConstraints({ advanced: [{ torch: true }] });
+                }
+
+                // 3. Ambil Lokasi GPS
+                navigator.geolocation.getCurrentPosition(pos => {
+                    document.getElementById('statGPS').innerText = 
+                        `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
+                });
+
+                // 4. Getar Feedback
+                if ("vibrate" in navigator) navigator.vibrate([100, 50, 100]);
+
+                btnMain.style.background = "var(--success)";
+                btnMain.innerText = "✅ SISTEM AKTIF";
+                
+            } catch (err) {
+                console.error(err);
+                alert("Izin ditolak atau hardware tidak ditemukan. Pastikan menggunakan HTTPS.");
+                btnMain.innerText = "Gagal Mengaktifkan";
+            }
+        });
+
+        // --- FITUR SENTER ---
+        btnSenter.addEventListener('click', async () => {
+            if (!track) return alert("Buka kamera dulu!");
+            const currentTorch = track.getConstraints().advanced?.[0]?.torch || false;
+            await track.applyConstraints({ advanced: [{ torch: !currentTorch }] });
+        });
+
+        // --- FITUR PEREKAM SUARA ---
+        document.getElementById('startRec').onclick = async () => {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            mediaRecorder.start();
+            audioChunks = [];
+            
+            document.getElementById('startRec').classList.add('record-active');
+            document.getElementById('startRec').disabled = true;
+            document.getElementById('stopRec').disabled = false;
+
+            mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(audioChunks, { type: 'audio/ogg; codecs=opus' });
+                audioPlayback.src = URL.createObjectURL(blob);
+                audioPlayback.style.display = 'block';
+            };
+        };
+
+        document.getElementById('stopRec').onclick = () => {
+            mediaRecorder.stop();
+            document.getElementById('startRec').classList.remove('record-active');
+            document.getElementById('startRec').disabled = false;
+            document.getElementById('stopRec').disabled = true;
+        };
+
+        // --- MONITOR STATUS (BATERAI, NET, ORIENTASI) ---
+        if ('getBattery' in navigator) {
+            navigator.getBattery().then(bat => {
+                const update = () => document.getElementById('statBat').innerText = `${Math.round(bat.level * 100)}% (${bat.charging ? 'Charging' : 'Discharging'})`;
+                update();
+                bat.onlevelchange = update;
+                bat.onchargingchange = update;
+            });
+        }
+
+        window.addEventListener('online', () => document.getElementById('statNet').innerText = "Online ✅");
+        window.addEventListener('offline', () => document.getElementById('statNet').innerText = "Offline ❌");
+        document.getElementById('statNet').innerText = navigator.onLine ? "Online ✅" : "Offline ❌";
+
+        window.addEventListener('deviceorientation', (e) => {
+            document.getElementById('statOri').innerText = `${Math.round(e.alpha)}° Arah`;
+        });
+
+        // --- LAINNYA ---
+        btnVibrate.onclick = () => navigator.vibrate(200);
+        document.getElementById('btnFull').onclick = () => {
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+            else document.exitFullscreen();
+        };
+
+    </script>
+</body>
+</html>
